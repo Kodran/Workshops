@@ -1,18 +1,51 @@
-FROM golang
+####################################################
+# Debug env
+####################################################
+FROM golang:latest AS debug
 
 WORKDIR /go/src/github.com/kodran/workshop/day3/webapi
+
+# Expose ports used for debugging
 EXPOSE 40000 1541
 
-# The -d flag instructs get to stop after downloading the packages; that is,
-# it instructs get not to install the packages.
+# Install delve debug tool
+RUN go get github.com/derekparker/delve/cmd/dlv
 
-# The -t flag instructs get to also download the packages required to build
-# the tests for the specified packages.
+# Copy all files in the proyect
+COPY . .
+
+# Run delve tool for debugging
+CMD [ "dlv", "debug", "github.com/kodran/workshop/day3/webapi", "--listen=:40000", "--headless=true", "--api-version=2", "--log" ]
+
+####################################################
+# Build application with his own go environment
+####################################################
+FROM golang:alpine AS release
+WORKDIR /go/src/github.com/kodran/workshop/day3/webapi
+
+# Copy all files in the proyect
+COPY . .
 
 # The -v flag enables verbose progress and debug output.
 RUN go get -d -t  -v ./...
 
-RUN go get github.com/derekparker/delve/cmd/dlv
-ADD . .
+# The -v flag enables verbose progress and debug output.
+# The -i flag will save dependency artifacts in the pkg folders.
+RUN go install -i -v github.com/kodran/workshop/day3/webapi
 
-CMD [ "dlv", "debug", "github.com/kodran/workshop/day3/webapi", "--listen=:40000", "--headless=true", "--api-version=2", "--log" ]
+CMD ["webapi"]
+# Build Go application targetting to run on linux
+#RUN GOOS=linux go build -o app -a --ldflags '-extldflags "-static"' -tags netgeo -installsuffix netgeo .
+
+# ####################################################
+# # Release only the application bin into the container
+# # Self contained application, builded only with linux runtime
+# ####################################################
+# FROM scratch
+# WORKDIR /root/
+# COPY --from=release /go/bin/webapi .
+# #RUN ls
+# #RUN chmod 777 /app
+
+# ENTRYPOINT [ "./webapi" ]
+
